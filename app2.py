@@ -16,7 +16,8 @@ class Translation(Resource):
         word = data['word']
         target = data['target']
         # https://stackabuse.com/text-translation-with-google-translate-api-in-python/
-        translated = GoogleTranslator(source='auto', target=target).translate(word)
+        translated = GoogleTranslator(source='auto', target='pt').translate(word)
+        print(translated)
         return translated, 200 if translated is not None else 404
 
 
