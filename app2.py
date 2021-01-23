@@ -86,9 +86,10 @@ class ImportFromYoutube(Resource):
         try:
             data = request.get_json(force=True)
             video = data['video']
+            name = data['name']
             extract = "="
             video_id = video[video.index(extract) + len(extract):]
-            print(video_id)
+            thumbnail = "https://i.ytimg.com/vi/" + video_id + "/maxresdefault.jpg"
 
         except ValueError as e:
             return e
@@ -99,20 +100,95 @@ class ImportFromYoutube(Resource):
             for i in YouTubeTranscriptApi.get_transcript(video_id):
                 new.append(i['text'])
             new = ''.join(new)
+            print(new)
+            print(video_id)
         except ValueError as e:
             return e
 
-        try:
-            from os import path
-            ROOT = path.dirname(path.realpath(__file__))
-            conn = sqlite3.connect(path.join(ROOT, "database.db"))
-            cur = conn.cursor()
-            cur.execute("INSERT INTO TB_IMPORT (video_id, text, video) VALUES (?, ?, ?)", (video_id, new, video))
-            conn.close()
-        except ValueError as e:
-            return e
+        from os import path
+        ROOT = path.dirname(path.realpath(__file__))
+        with sqlite3.connect(path.join(ROOT, "database.db")) as con:
+            cur = con.cursor()
+            cur.execute("INSERT INTO TB_IMPORT (video_id, text, video, name, thumbnail) VALUES (?, ?, ?, ?, ?)",
+                        (video_id, new, video, name, thumbnail))
+            print("Record successfully added")
+            # con.close()
 
         return "Record successfully added", 201
+
+
+class ImportsFromYoutube(Resource):
+    def get(self):
+        from os import path
+        ROOT = path.dirname(path.realpath(__file__))
+        conn = sqlite3.connect(path.join(ROOT, "database.db"))
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT video_id, text, video, thumbnail, name, likes, dislikes FROM TB_IMPORT")
+        rows = cur.fetchall()
+        conn.close()
+        data = []
+        for row in rows:
+            data.append([x for x in row])
+
+        return [dict(zip(("video_id", "text", "video", "thumbnail", "name", "likes", "dislikes"), vv)) for vv in data]
+
+
+class YoutubeLessonsLike(Resource):
+    def post(self):
+        try:
+            data = request.get_json(force=True)
+            video_id = data['video_id']
+        except ValueError as e:
+            print(e)
+
+        from os import path
+        ROOT = path.dirname(path.realpath(__file__))
+        conn = sqlite3.connect(path.join(ROOT, "database.db"))
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("UPDATE TB_IMPORT SET likes = (( SELECT ifnull(likes, 0) FROM TB_IMPORT WHERE video_id = ?) + 1) WHERE video_id = ?;", (video_id, video_id))
+        conn.commit()
+        conn.close()
+        return "Ok", 201
+
+
+class YoutubeLessonsDislike(Resource):
+    def post(self):
+        try:
+            data = request.get_json(force=True)
+            video_id = data['video_id']
+        except ValueError as e:
+            print(e)
+
+        from os import path
+        ROOT = path.dirname(path.realpath(__file__))
+        conn = sqlite3.connect(path.join(ROOT, "database.db"))
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("UPDATE TB_IMPORT SET dislikes = (( SELECT ifnull(dislikes, 0) FROM TB_IMPORT WHERE video_id = ?) + 1) WHERE video_id = ?;", (video_id, video_id))
+        conn.commit()
+        conn.close()
+        return "Ok", 201
+
+class StudyByLesson(Resource):
+    def post(self):
+        from os import path
+        data = request.get_json(force=True)
+        video_id = data['video_id']
+        ROOT = path.dirname(path.realpath(__file__))
+        conn = sqlite3.connect(path.join(ROOT, "database.db"))
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT video_id, text, video, thumbnail, name FROM TB_IMPORT WHERE video_id =?;", [video_id])
+        rows = cur.fetchall()
+        conn.close()
+
+        data = []
+        for row in rows:
+            data.append([x for x in row])
+
+        return [dict(zip(("video_id", "text", "video", "thumbnail", "name"), vv)) for vv in data]
 
 
 api.add_resource(Translation, '/translation')
@@ -120,6 +196,12 @@ api.add_resource(ToeflResourcesList, '/toefl')
 api.add_resource(ToeflItemResourcesList, '/toefl/<int:tpo>')
 api.add_resource(ToeflResources, '/store')
 api.add_resource(ImportFromYoutube, '/import')
+api.add_resource(ImportsFromYoutube, '/imports')
+api.add_resource(StudyByLesson, '/studybylesson')
+api.add_resource(YoutubeLessonsLike, '/likes')
+api.add_resource(YoutubeLessonsDislike, '/dislikes')
+
+
 
 
 @app.route('/')
