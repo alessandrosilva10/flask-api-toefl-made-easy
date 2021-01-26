@@ -1,16 +1,23 @@
 import json
-
+from os import path
 from flask import Flask, request
 from flask_restful import Resource, Api
 from deep_translator import GoogleTranslator
 import sqlite3
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from resources.User import GetAllUsers, CreateUser, GetUser, UpdateUser, DeleteUser, PromoteUser, Login
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+ROOT = path.dirname(path.realpath(__file__))
+app.config['SECRET_KEY'] = "ETFKn!RCNTE&KTU_k6&!K*tU7uK2$xreGe@Q^@yKX74B^ydNkaj@F%746@A@*VU!"
+# app.config['SQLALCHEMY_DATABASE_URI'] = path.join(ROOT, "database.db")
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-app.secret_key = "ETFKn!RCNTE&KTU_k6&!K*tU7uK2$xreGe@Q^@yKX74B^ydNkaj@F%746@A@*VU!"
 api = Api(app)
+db = SQLAlchemy(app)
 
 
 class Translation(Resource):
@@ -147,7 +154,9 @@ class YoutubeLessonsLike(Resource):
         conn = sqlite3.connect(path.join(ROOT, "database.db"))
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute("UPDATE TB_IMPORT SET likes = (( SELECT ifnull(likes, 0) FROM TB_IMPORT WHERE video_id = ?) + 1) WHERE video_id = ?;", (video_id, video_id))
+        cur.execute(
+            "UPDATE TB_IMPORT SET likes = (( SELECT ifnull(likes, 0) FROM TB_IMPORT WHERE video_id = ?) + 1) WHERE video_id = ?;",
+            (video_id, video_id))
         conn.commit()
         conn.close()
         return "Ok", 201
@@ -166,10 +175,13 @@ class YoutubeLessonsDislike(Resource):
         conn = sqlite3.connect(path.join(ROOT, "database.db"))
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        cur.execute("UPDATE TB_IMPORT SET dislikes = (( SELECT ifnull(dislikes, 0) FROM TB_IMPORT WHERE video_id = ?) + 1) WHERE video_id = ?;", (video_id, video_id))
+        cur.execute(
+            "UPDATE TB_IMPORT SET dislikes = (( SELECT ifnull(dislikes, 0) FROM TB_IMPORT WHERE video_id = ?) + 1) WHERE video_id = ?;",
+            (video_id, video_id))
         conn.commit()
         conn.close()
         return "Ok", 201
+
 
 class StudyByLesson(Resource):
     def post(self):
@@ -202,7 +214,13 @@ api.add_resource(YoutubeLessonsLike, '/likes')
 api.add_resource(YoutubeLessonsDislike, '/dislikes')
 
 
-
+api.add_resource(CreateUser, '/user')
+api.add_resource(GetAllUsers, '/users')
+api.add_resource(GetUser, '/user/<string:public_id>')
+api.add_resource(UpdateUser, '/user/<string:public_id>')
+api.add_resource(DeleteUser, '/user/<string:public_id>')
+api.add_resource(PromoteUser, '/user/promote/<string:public_id>')
+api.add_resource(Login, '/login')
 
 @app.route('/')
 def index():

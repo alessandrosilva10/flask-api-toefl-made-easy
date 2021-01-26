@@ -1,6 +1,2 @@
 venv
-models
-resources
-app.py
-security.py
-user.py
+database.db
